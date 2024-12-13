@@ -35,6 +35,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=2)
     parser.add_argument("--visualize", type=bool, default=False)
     parser.add_argument("--project", type=bool, default=True)
+    parser.add_argument("--q", type=float, default=0.2)
     args = parser.parse_args()
 
     # TODO: Add other models: basic ResNetand other baselines (VGG, AlexNet, ...)
@@ -62,13 +63,13 @@ if __name__ == "__main__":
     # FedAvg
     model_f, loss_hist_FA, acc_hist_FA = FedProx(
         model_0, mnist_train_dls, args.n_iter,
-        mnist_test_dls, epochs=args.epochs, lr=args.lr, mu=0, project=args.project
+        mnist_test_dls, epochs=args.epochs, lr=args.lr, mu=0, project=args.project, q=args.q
     )
 
     # FedProx
     model_f, loss_hist_FP, acc_hist_FP = FedProx(
         model_0, mnist_train_dls, args.n_iter,
-        mnist_test_dls, epochs=args.epochs, lr=args.lr, mu=0.3, project=args.project)
+        mnist_test_dls, epochs=args.epochs, lr=args.lr, mu=0.3, project=args.project, q=args.q)
 
     # comparison
     plot_acc_loss("ProjFedAvg MNIST-iid", loss_hist_FA, acc_hist_FA)

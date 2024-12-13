@@ -40,7 +40,7 @@ def accuracy_dataset(model, dataset):
     return accuracy
 
 
-def train_step(model, model_0, mu: int, optimizer, train_data, loss_f):
+def train_step(model, model_0, mu: int, optimizer, train_data, loss_f, q):
     """Train `model` on one epoch of `train_data`"""
 
     total_loss = 0
@@ -52,7 +52,7 @@ def train_step(model, model_0, mu: int, optimizer, train_data, loss_f):
 
         loss = loss_f(predictions, labels)
         loss += mu / 2 * difference_models_norm_2(model, model_0)
-        total_loss += loss
+        total_loss += (1/(q+1)) * loss ** (1 + q)
 
         loss.backward()
         optimizer.step()
@@ -60,11 +60,11 @@ def train_step(model, model_0, mu: int, optimizer, train_data, loss_f):
     return total_loss / (idx + 1)
 
 
-def local_learning(model, mu: float, optimizer, train_data, epochs: int, loss_f):
+def local_learning(model, mu: float, optimizer, train_data, epochs: int, loss_f, q):
     model_0 = deepcopy(model)
 
     for e in range(epochs):
-        local_loss = train_step(model, model_0, mu, optimizer, train_data, loss_f)
+        local_loss = train_step(model, model_0, mu, optimizer, train_data, loss_f, q) 
 
     return float(local_loss.detach().numpy())
 

@@ -47,7 +47,7 @@ def average_models(model, prev, clients_models_hist: list, weights: list, first,
 
 
 def FedProx(model, training_sets: list, n_iter: int, testing_sets: list, mu=0,
-            file_name="test", epochs=5, lr=10 ** -2, decay=1, project=True, q=0):
+            file_name="test", epochs=5, lr=10 ** -2, decay=1, project=True, q=0.2):
     """ all the clients are considered in this implementation of FedProx
     Parameters:
         - `model`: common structure used by the clients and the server
