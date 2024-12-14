@@ -1,5 +1,6 @@
 import torch
 from torchvision import datasets
+from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 from torchvision import transforms
 import matplotlib.pyplot as plt
 
@@ -45,8 +46,69 @@ def iid_split(dataset, nb_nodes, n_samples_per_node, batch_size, shuffle):
 
     return data_splitted
 
+def iid_split_with_perturbation(dataset_mnist, dataset_fmnist, nb_nodes, n_samples_per_node, batch_size, shuffle, alpha=0.2):
+    mnist_loader = DataLoader(dataset_mnist, batch_size=n_samples_per_node * nb_nodes, shuffle=shuffle)
+    mnist_data = next(iter(mnist_loader))
+    
+    # Create a DataLoader for Fashion MNIST
+    fmnist_loader = DataLoader(dataset_fmnist, batch_size=int(n_samples_per_node*alpha), shuffle=shuffle)
+    fmnist_data = next(iter(fmnist_loader))
+    
+    data_splitted = []
+    perturbed_node = 2
+    
+    for i in range(nb_nodes):
+        start_idx = i * n_samples_per_node
+        end_idx = (i + 1) * n_samples_per_node
+        
+        if i == perturbed_node:
+            mnist_portion = int(n_samples_per_node * (1 - alpha))
+            node_data = (
+                torch.cat([mnist_data[0][start_idx:start_idx+mnist_portion], fmnist_data[0]]),
+                torch.cat([mnist_data[1][start_idx:start_idx+mnist_portion], fmnist_data[1]])
+            )
+        else:
+            node_data = (mnist_data[0][start_idx:end_idx], mnist_data[1][start_idx:end_idx])
+        
+        node_dataset = TensorDataset(*node_data)
+        node_loader = DataLoader(node_dataset, batch_size=batch_size, shuffle=shuffle)
+        data_splitted.append(node_loader)
+    
+    return data_splitted
 
-def  get_MNIST(type="iid", n_samples_train=200, n_samples_test=100, n_clients=3, batch_size=25, shuffle=True):
+def get_MNIST_with_perturbation(type="iid", n_samples_train=200, n_samples_test=100, n_clients=3, batch_size=25, shuffle=True, alpha=0.2):
+    train_mnist = datasets.MNIST(
+            root="./data",
+            train=True,
+            download=True,
+            transform=transforms.ToTensor()
+    )
+    test_mnist = datasets.MNIST(
+            root="./data",
+            train=False,
+            download=True,
+            transform=transforms.ToTensor()
+    )
+
+    train_fmnist = datasets.FashionMNIST(
+            root="./data",
+            train=True,
+            download=True,
+            transform=transforms.ToTensor()
+    )
+    test_fmnist = datasets.FashionMNIST(
+            root="./data",
+            train=False,
+            download=True,
+            transform=transforms.ToTensor()
+    )
+
+    train =iid_split_with_perturbation(train_mnist, train_fmnist, n_clients, n_samples_train, batch_size, shuffle, alpha)
+    test=iid_split(test_mnist, n_clients, n_samples_test, batch_size, shuffle)
+
+    return train, test 
+
+def get_MNIST(type="iid", n_samples_train=200, n_samples_test=100, n_clients=3, batch_size=25, shuffle=True):
     dataset_loaded_train = datasets.MNIST(
             root="./data",
             train=True,
@@ -72,8 +134,58 @@ def  get_MNIST(type="iid", n_samples_train=200, n_samples_test=100, n_clients=3,
 
     return train, test
 
+def get_CIFAR10(type="iid", n_samples_train=200, n_samples_test=100, n_clients=3, batch_size=25, shuffle=True):
+    dataset_loaded_train = datasets.CIFAR10(
+            root="./data",
+            train=True,
+            download=True,
+            transform=transforms.ToTensor()
+    )
+    dataset_loaded_test = datasets.CIFAR10(
+            root="./data",
+            train=False,
+            download=True,
+            transform=transforms.ToTensor()
+    )
 
-    
+    if type=="iid":
+        train=iid_split(dataset_loaded_train, n_clients, n_samples_train, batch_size, shuffle)
+        test=iid_split(dataset_loaded_test, n_clients, n_samples_test, batch_size, shuffle)
+    elif type=="non_iid":
+        train=non_iid_split(dataset_loaded_train, n_clients, n_samples_train, batch_size, shuffle)
+        test=non_iid_split(dataset_loaded_test, n_clients, n_samples_test, batch_size, shuffle)
+    else:
+        train=[]
+        test=[]
+
+    return train, test
+
+def get_FashionMNIST(type="iid", n_samples_train=200, n_samples_test=100, n_clients=3, batch_size=25, shuffle=True):
+    dataset_loaded_train = datasets.FashionMNIST(
+            root="./data",
+            train=True,
+            download=True,
+            transform=transforms.ToTensor()
+    )
+    dataset_loaded_test = datasets.FashionMNIST(
+            root="./data",
+            train=False,
+            download=True,
+            transform=transforms.ToTensor()
+    )
+
+    if type=="iid":
+        train=iid_split(dataset_loaded_train, n_clients, n_samples_train, batch_size, shuffle)
+        test=iid_split(dataset_loaded_test, n_clients, n_samples_test, batch_size, shuffle)
+    elif type=="non_iid":
+        train=non_iid_split(dataset_loaded_train, n_clients, n_samples_train, batch_size, shuffle)
+        test=non_iid_split(dataset_loaded_test, n_clients, n_samples_test, batch_size, shuffle)
+    else:
+        train=[]
+        test=[]
+
+    return train, test
+
 def plot_samples(data, channel:int, title=None, plot_name="", n_examples =20):
 
     n_rows = int(n_examples / 5)
@@ -85,6 +197,24 @@ def plot_samples(data, channel:int, title=None, plot_name="", n_examples =20):
         ax = plt.subplot(n_rows, 5, idx + 1)
 
         image = 255 - X[idx, channel].view((28,28))
+        ax.imshow(image, cmap='gist_gray')
+        ax.axis("off")
+
+    if plot_name!="":plt.savefig(f"plots/"+plot_name+".png")
+
+    plt.tight_layout()
+
+def plot_samples_cifar(data, channel:int, title=None, plot_name="", n_examples =20):
+
+    n_rows = int(n_examples / 5)
+    plt.figure(figsize=(1* n_rows, 1*n_rows))
+    if title: plt.suptitle(title)
+    X, y= data
+    for idx in range(n_examples):
+        
+        ax = plt.subplot(n_rows, 5, idx + 1)
+
+        image = 255 - X[idx, channel].view((32,32))
         ax.imshow(image, cmap='gist_gray')
         ax.axis("off")
 
